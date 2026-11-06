@@ -1,0 +1,35 @@
+{
+    "name": "apachish/wp-repo",
+    "description": "Serve and deploy WordPress plugins/themes from private Git repositories to tenant WordPress sites (update-server API + mu-plugin + direct push).",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.3",
+        "ext-zip": "*",
+        "illuminate/support": "^11.0|^12.0|^13.0",
+        "illuminate/http": "^11.0|^12.0|^13.0",
+        "illuminate/queue": "^11.0|^12.0|^13.0",
+        "illuminate/console": "^11.0|^12.0|^13.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0|^10.0|^11.0",
+        "pestphp/pest": "^3.0|^4.0"
+    },
+    "suggest": {
+        "livewire/livewire": "Required for the admin panel (^3.0|^4.0)"
+    },
+    "autoload": {
+        "psr-4": { "Apachish\\WpRepo\\": "src/" }
+    },
+    "autoload-dev": {
+        "psr-4": { "Apachish\\WpRepo\\Tests\\": "tests/" }
+    },
+    "extra": {
+        "laravel": {
+            "providers": ["Apachish\\WpRepo\\WpRepoServiceProvider"]
+        }
+    },
+    "config": { "allow-plugins": { "pestphp/pest-plugin": true } },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
