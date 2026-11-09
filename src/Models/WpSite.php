@@ -19,6 +19,25 @@ class WpSite extends Model
 
     protected $casts = ['last_check_at' => 'datetime'];
 
+    protected static function booted(): void
+    {
+        static::creating(function ($model) {
+            $project = current_project();
+
+            if ($project) {
+                $model->project_id = $project->id;
+            }
+        });
+
+        static::updating(function ($model) {
+            $project = current_project();
+
+            if ($project) {
+                $model->project_id = $project->id;
+            }
+        });
+    }
+    
     public function sitePackages(): HasMany
     {
         return $this->hasMany(WpSitePackage::class);

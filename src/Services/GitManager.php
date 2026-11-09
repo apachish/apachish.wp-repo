@@ -3,24 +3,36 @@
 namespace Apachish\WpRepo\Services;
 
 use Apachish\WpRepo\Contracts\GitProvider;
+use Apachish\WpRepo\Models\WpGitConnection;
+use Apachish\WpRepo\Models\WpPackage;
 use Apachish\WpRepo\Providers\GiteaProvider;
 use Apachish\WpRepo\Providers\GitHubProvider;
 use Apachish\WpRepo\Providers\GitLabProvider;
 use InvalidArgumentException;
+use RuntimeException;
 
 class GitManager
 {
-    public function provider(?string $name = null): GitProvider
+    public function forConnection(WpGitConnection $connection): GitProvider
     {
-        $name ??= config('wp-repo.provider', 'github');
-        $key = $name === 'forgejo' ? 'gitea' : $name;
-        $config = config("wp-repo.providers.{$key}", []);
+        $config = $connection->providerConfig();
 
-        return match ($key) {
+        return match ($connection->provider) {
             'github' => new GitHubProvider($config),
             'gitlab' => new GitLabProvider($config),
-            'gitea' => new GiteaProvider($config),
-            default => throw new InvalidArgumentException("Unknown git provider [{$name}]"),
+            'gitea', 'forgejo' => new GiteaProvider($config),
+            default => throw new InvalidArgumentException("Unknown git provider [{$connection->provider}]"),
         };
+    }
+
+    public function forPackage(WpPackage $package): GitProvider
+    {
+        $connection = $package->connection;
+
+        if (! $connection) {
+            throw new RuntimeException("Package [{$package->slug}] has no Git connection.");
+        }
+
+        return $this->forConnection($connection);
     }
 }

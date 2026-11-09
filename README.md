@@ -30,17 +30,9 @@ php artisan vendor:publish --tag=wp-repo-config
 
 اگر مایگریشن را publish می‌کنید: `'load_migrations' => false` بگذارید.
 
-### .env
+### اعتبارنامه‌ی گیت (بدون .env)
 
-```env
-WP_REPO_PROVIDER=github          # github | gitlab | gitea
-WP_REPO_GITHUB_TOKEN=...         # فقط خواندنی (fine-grained token)
-WP_REPO_GITHUB_WEBHOOK_SECRET=...
-WP_REPO_REGISTRATION_TOKEN=...   # اختیاری، برای POST /sites/register
-WP_REPO_DISK=local               # دیسک خصوصی
-```
-
-برای GitLab/Gitea: `WP_REPO_GITLAB_TOKEN`, `WP_REPO_GITEA_API`, `WP_REPO_GITEA_TOKEN` و secret متناظر.
+هیچ توکن یا secret ای در config/.env نیست. هر پروژه در پنل (**Git connections**) اتصال گیت خودش را می‌سازد؛ توکن و secret رمزنگاری‌شده (`encrypted` cast) در دیتابیس ذخیره می‌شوند و هرگز به مرورگر برنگردانده یا serialize نمی‌شوند. فقط اگر مایل بودید: `WP_REPO_DISK` و `WP_REPO_REGISTRATION_TOKEN` در `.env` هستند.
 
 ### صف و زمان‌بند
 
@@ -63,21 +55,28 @@ Gate::define('manage-wp-repo', fn ($user) => $user->hasRole('super-admin'));
 
 `tenancy.resolver` را روی یک کلاس invokable بگذارید که `project_id` فعلی (خروجی `ResolveCurrentProject`) را برمی‌گرداند. بدون resolver و بدون binding با نام `current_project` هیچ scope‌ای اعمال نمی‌شود. پکیج‌هایی با `project_id = null` برای همه پروژه‌ها دیده می‌شوند.
 
-## راه‌اندازی Webhook
+## اتصال گیت هر پروژه
 
-آدرس: `https://apachish.ir/api/wp-updates/webhook/{github|gitlab|gitea}`
+**Git connections ← Add**: نام، سرویس (GitHub/GitLab/Gitea)، توکن **فقط خواندنی** و برای سرور اختصاصی، آدرس API (فقط https).
 
-- GitHub: Content type `application/json`، Secret = `WP_REPO_GITHUB_WEBHOOK_SECRET`، رویدادهای *Releases* (و در صورت نیاز *Pushes*، که فقط تگ‌ها پردازش می‌شوند).
-- GitLab: Secret token، رویدادهای *Releases events* و *Tag push events*.
-- Gitea/Forgejo: Secret، رویداد *Release* و *Push*.
+| سرویس | توکن | دسترسی |
+|---|---|---|
+| GitHub | Fine-grained token | فقط ریپوهای لازم، **Contents: Read-only** |
+| GitLab | Project/Group access token | Reporter + `read_api` + `read_repository` |
+| Gitea/Forgejo | Application token | `read:repository` |
 
-مهم: نسخه‌ای که ثبت می‌شود همان `Version:` داخل هدر فایل اصلی پلاگین/`style.css` است (چون وردپرس همان را مقایسه می‌کند)؛ تگ و هدر را هم‌نسخه نگه دارید.
+بعد از ذخیره، یک بار **Webhook secret** و **Webhook URL** (به شکل `/api/wp-updates/webhook/c/{uuid}`) نمایش داده می‌شود؛ secret دوباره نشان داده نمی‌شود (در صورت گم شدن «Secret جدید» بسازید). در گیت: Content type = `application/json`، همان secret، رویداد *Releases* (و در صورت نیاز *Pushes* برای تگ‌ها؛ در GitLab: *Release events* و *Tag push events*).
+
+هر webhook فقط پکیج‌های همان اتصال را همگام می‌کند، پس secret یک پروژه به پکیج‌های پروژه‌ی دیگر دسترسی ندارد.
+
+مهم: نسخه‌ی ثبت‌شده همان `Version:` داخل هدر فایل اصلی پلاگین/`style.css` است؛ تگ و هدر را هم‌نسخه نگه دارید.
 
 ## استفاده
 
-1. **Packages → Add package:** `slug` باید دقیقاً نام پوشه‌ی پلاگین/قالب در وردپرس باشد. `repo` به شکل `owner/repo` است.
-2. با Release جدید، نسخه خودکار ساخته می‌شود. دستی: `php artisan wp-repo:sync my-plugin`.
-3. **Sites → Add site:** دامنه (و برای push، مسیر نصب وردپرس). کلید API فقط یک بار نمایش داده می‌شود.
+1. **Git connections:** اتصال بسازید (بالا).
+2. **Packages ← Add package:** `slug` دقیقاً نام پوشه‌ی پلاگین/قالب در وردپرس است، `repo` به شکل `owner/repo` و یک Git connection انتخاب کنید.
+3. با Release جدید نسخه خودکار ساخته می‌شود. دستی: `php artisan wp-repo:sync my-plugin`.
+4. **Sites ← Add site:** دامنه (و برای push، مسیر نصب وردپرس). کلید API فقط یک بار نمایش داده می‌شود.
 
 ### حالت Pull (mu-plugin)
 
@@ -127,14 +126,15 @@ public function allows(WpSite $site, WpPackage $package): bool
 
 | متد | مسیر | توضیح |
 |---|---|---|
-| POST | `/webhook/{provider}` | امضا اعتبارسنجی می‌شود، Job صف می‌خورد |
+| POST | `/webhook/c/{uuid}` | امضا با secret همان اتصال اعتبارسنجی می‌شود، Job صف می‌خورد |
 | GET | `/check?slug=&type=&version=` | هدرها: `X-Site-Domain`, `X-Site-Key` |
 | GET | `/download/{version}` | فقط با لینک signed |
 | POST | `/sites/register` | هدر `X-Registration-Token` |
 
 ## امنیت
 
-- توکن گیت read-only و فقط در `.env`. هرگز در لاگ یا پاسخ نمی‌آید.
+- توکن و secret گیت per-project، رمزنگاری‌شده در دیتابیس، `hidden` در مدل و هرگز در لاگ/پاسخ.
+- آدرس API سفارشی باید https باشد و به IP عمومی resolve شود (جلوگیری از SSRF توسط tenant)؛ برای Git داخلی `allow_private_hosts` را فقط در نصب‌های غیرمشترک روشن کنید.
 - Webhook با `hash_equals`. کلید سایت‌ها فقط به شکل sha256 ذخیره می‌شود.
 - استخراج zip در برابر Zip Slip، symlink و حجم بیش‌ازحد محافظت شده است.
 - لینک دانلود signed و کوتاه‌عمر؛ mu-plugin قبل از نصب checksum را بررسی می‌کند.

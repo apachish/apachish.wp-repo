@@ -13,6 +13,7 @@ class WpPackageVersion extends Model
 
     protected $casts = ['released_at' => 'datetime', 'is_stable' => 'boolean'];
 
+
     public function package(): BelongsTo
     {
         return $this->belongsTo(WpPackage::class, 'wp_package_id')->withoutGlobalScopes();

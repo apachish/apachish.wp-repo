@@ -7,12 +7,14 @@ use Apachish\WpRepo\Console\DeployCommand;
 use Apachish\WpRepo\Console\PruneCommand;
 use Apachish\WpRepo\Console\SyncCommand;
 use Apachish\WpRepo\Contracts\EntitlementChecker;
+use Apachish\WpRepo\Livewire\Connections;
 use Apachish\WpRepo\Livewire\Logs;
 use Apachish\WpRepo\Livewire\PackageDetail;
 use Apachish\WpRepo\Livewire\Packages;
 use Apachish\WpRepo\Livewire\Sites;
 use Apachish\WpRepo\Services\GitManager;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -23,6 +25,7 @@ class WpRepoServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/wp-repo.php', 'wp-repo');
+        $this->mergeConfigFrom(__DIR__.'/../config/seeder.php', 'package-seeders');
 
         $this->app->singleton(GitManager::class);
         $this->app->bind(EntitlementChecker::class, fn ($app) => $app->make(config('wp-repo.entitlement')));
@@ -34,7 +37,7 @@ class WpRepoServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'wp-repo');
 
         if (config('wp-repo.load_migrations', true)) {
-            $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+            $this->loadMigrationsFrom(__DIR__.'/Database/Migrations');
         }
 
         $this->registerRoutes();
@@ -61,7 +64,14 @@ class WpRepoServiceProvider extends ServiceProvider
 
     protected function registerRoutes(): void
     {
-        Route::middleware(config('wp-repo.api.middleware', []))
+        // The API routes are not in the "web"/"api" group, so route-model binding ({version}) needs
+        // SubstituteBindings explicitly; without it the controller receives an EMPTY model.
+        $apiMiddleware = array_values(array_unique(array_merge(
+            (array) config('wp-repo.api.middleware', []),
+            [SubstituteBindings::class]
+        )));
+
+        Route::middleware($apiMiddleware)
             ->prefix(config('wp-repo.api.prefix', 'api/wp-updates'))
             ->group(__DIR__.'/../routes/api.php');
 
@@ -91,6 +101,7 @@ class WpRepoServiceProvider extends ServiceProvider
 
         Livewire::component('wp-repo.packages', Packages::class);
         Livewire::component('wp-repo.package-detail', PackageDetail::class);
+        Livewire::component('wp-repo.connections', Connections::class);
         Livewire::component('wp-repo.sites', Sites::class);
         Livewire::component('wp-repo.logs', Logs::class);
     }

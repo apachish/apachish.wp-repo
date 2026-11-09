@@ -22,7 +22,13 @@ abstract class AbstractGitProvider implements GitProvider
 
     protected function baseUrl(): string
     {
-        return rtrim((string) ($this->config['api'] ?? ''), '/');
+        $url = rtrim((string) ($this->config['api'] ?? ''), '/');
+
+        if (! empty($this->config['custom_api'])) {
+            \Apachish\WpRepo\Support\UrlGuard::assertSafe($url);
+        }
+
+        return $url;
     }
 
     public function downloadZip(string $repo, string $ref, string $destination): void

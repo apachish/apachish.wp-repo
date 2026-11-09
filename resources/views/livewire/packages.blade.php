@@ -22,14 +22,14 @@
 
             <label class="space-y-1 text-sm">
                 <span>{{ __('wp-repo::messages.slug') }}</span>
-                <input wire:model="form.slug" type="text" dir="ltr" @disabled($editingId)
+                <input wire:model="form.slug" type="text" dir="ltr" @disabled($locked)
                        class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950">
                 @error('form.slug') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
             </label>
 
             <label class="space-y-1 text-sm">
                 <span>{{ __('wp-repo::messages.type') }}</span>
-                <select wire:model="form.type" @disabled($editingId)
+                <select wire:model="form.type" @disabled($locked)
                         class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950">
                     <option value="plugin">{{ __('wp-repo::messages.plugin') }}</option>
                     <option value="theme">{{ __('wp-repo::messages.theme') }}</option>
@@ -51,13 +51,18 @@
             </label>
 
             <label class="space-y-1 text-sm">
-                <span>{{ __('wp-repo::messages.provider') }}</span>
-                <select wire:model="form.git_provider"
+                <span>{{ __('wp-repo::messages.connection') }}</span>
+                <select wire:model="form.wp_git_connection_id"
                         class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-950">
-                    <option value="github">GitHub</option>
-                    <option value="gitlab">GitLab</option>
-                    <option value="gitea">Gitea / Forgejo</option>
+                    <option value="">—</option>
+                    @foreach ($connections as $c)
+                        <option value="{{ $c->id }}">{{ $c->name }} ({{ $c->provider }})</option>
+                    @endforeach
                 </select>
+                @if ($connections->isEmpty())
+                    <p class="text-xs text-amber-600"><a href="{{ route('wp-repo.panel.connections',['api_key' =>  data_get($project,"api_key")]) }}" wire:navigate class="underline">{{ __('wp-repo::messages.no_connection_hint') }}</a></p>
+                @endif
+                @error('form.wp_git_connection_id') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
             </label>
 
             <div class="flex items-end gap-6 text-sm">
@@ -87,10 +92,10 @@
                 @forelse ($packages as $package)
                     <tr wire:key="pkg-{{ $package->id }}">
                         <td class="px-4 py-2">
-                            <a href="{{ route('wp-repo.panel.package', $package) }}" wire:navigate class="font-medium text-indigo-600 hover:underline dark:text-indigo-400">{{ $package->name }}</a>
+                            <a href="{{ route('wp-repo.panel.package',['api_key' =>  data_get($project,"api_key"),"package"=>$package]) }}" wire:navigate class="font-medium text-indigo-600 hover:underline dark:text-indigo-400">{{ $package->name }}</a>
                             <div class="text-xs text-slate-500" dir="ltr">{{ $package->slug }} · {{ __('wp-repo::messages.'.$package->type) }}@if ($package->is_paid) · {{ __('wp-repo::messages.paid') }}@endif</div>
                         </td>
-                        <td class="px-4 py-2" dir="ltr">{{ $package->repo }} <span class="text-xs text-slate-500">({{ $package->git_provider }})</span></td>
+                        <td class="px-4 py-2" dir="ltr">{{ $package->repo }} <span class="text-xs text-slate-500">({{ $package->connection?->name ?? '—' }})</span></td>
                         <td class="px-4 py-2" dir="ltr">{{ $package->latestStable()?->version ?? '—' }}</td>
                         <td class="px-4 py-2">
                             <button wire:click="toggle({{ $package->id }})"

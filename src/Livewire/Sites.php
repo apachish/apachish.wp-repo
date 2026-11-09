@@ -33,9 +33,13 @@ class Sites extends Component
 
     public ?string $message = null;
 
+    public $project;
+
     public function mount(): void
     {
         Gate::authorize('manage-wp-repo');
+        $this->project = current_project();
+
     }
 
     public function createSite(): void

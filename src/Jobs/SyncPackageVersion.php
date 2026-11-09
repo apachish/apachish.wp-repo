@@ -38,7 +38,7 @@ class SyncPackageVersion implements ShouldQueue, ShouldBeUnique
     public function handle(GitManager $git, PackageBuilder $builder): void
     {
         $package = WpPackage::withoutGlobalScopes()->findOrFail($this->packageId);
-        $provider = $git->provider($package->git_provider);
+        $provider = $git->forPackage($package);
 
         $tmp = config('wp-repo.tmp_path');
         if (! is_dir($tmp)) {

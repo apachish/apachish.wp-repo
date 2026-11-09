@@ -3,7 +3,9 @@
 namespace Apachish\WpRepo\Livewire;
 
 use Apachish\WpRepo\Jobs\SyncPackageVersion;
+use Apachish\WpRepo\Models\WpGitConnection;
 use Apachish\WpRepo\Models\WpPackage;
+use Apachish\WpRepo\Support\RepoName;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -20,22 +22,31 @@ class Packages extends Component
 
     public ?int $editingId = null;
 
+    /** slug/type define the folder name inside WordPress, so they lock once versions or sites exist. */
+    public bool $locked = false;
+
     public array $form = [];
 
     public ?string $message = null;
+
+    public $project;
+
 
     public function mount(): void
     {
         Gate::authorize('manage-wp-repo');
         $this->resetForm();
+        $this->project = current_project();
+
     }
 
     protected function resetForm(): void
     {
         $this->editingId = null;
+        $this->locked = false;
         $this->form = [
             'slug' => '', 'type' => 'plugin', 'name' => '', 'repo' => '',
-            'git_provider' => config('wp-repo.provider', 'github'), 'is_active' => true, 'is_paid' => false,
+            'wp_git_connection_id' => '', 'is_active' => true, 'is_paid' => false,
         ];
         $this->resetValidation();
     }
@@ -47,7 +58,7 @@ class Packages extends Component
             'form.type' => ['required', 'in:plugin,theme'],
             'form.name' => ['required', 'string', 'max:150'],
             'form.repo' => ['required', 'regex:/^[\w.\-]+(\/[\w.\-]+)+$/', 'max:200'],
-            'form.git_provider' => ['required', 'in:github,gitlab,gitea'],
+            'form.wp_git_connection_id' => ['required', 'integer'],
             'form.is_active' => ['boolean'],
             'form.is_paid' => ['boolean'],
         ];
@@ -70,19 +81,25 @@ class Packages extends Component
         Gate::authorize('manage-wp-repo');
         $package = WpPackage::findOrFail($id);
         $this->editingId = $package->id;
-        $this->form = $package->only(['slug', 'type', 'name', 'repo', 'git_provider', 'is_active', 'is_paid']);
+        $this->locked = $package->versions()->exists() || $package->sitePackages()->exists();
+        $this->form = $package->only(['slug', 'type', 'name', 'repo', 'wp_git_connection_id', 'is_active', 'is_paid']);
         $this->showForm = true;
     }
 
     public function save(): void
     {
         Gate::authorize('manage-wp-repo');
+        $this->form['repo'] = RepoName::normalize($this->form['repo'] ?? '');
         $data = $this->validate()['form'];
+
+        // Scoped lookup: a tenant can only pick one of its own connections.
+        $connection = WpGitConnection::findOrFail((int) $data['wp_git_connection_id']);
+        $data['wp_git_connection_id'] = $connection->id;
+        $data['git_provider'] = $connection->provider;
 
         if ($this->editingId) {
             $package = WpPackage::findOrFail($this->editingId);
-            // slug/type are immutable: they define the folder name inside WordPress.
-            $package->update(collect($data)->except(['slug', 'type'])->all());
+            $package->update(collect($data)->except($this->locked ? ['slug', 'type'] : [])->all());
         } else {
             WpPackage::create($data);
         }
@@ -127,10 +144,13 @@ class Packages extends Component
                 ->where('name', 'like', '%'.$this->search.'%')
                 ->orWhere('slug', 'like', '%'.$this->search.'%')
                 ->orWhere('repo', 'like', '%'.$this->search.'%')))
+            ->with('connection:id,name')
             ->latest()
             ->paginate(15);
 
-        return view('wp-repo::livewire.packages', compact('packages'))
+        $connections = WpGitConnection::orderBy('name')->get(['id', 'name', 'provider']);
+
+        return view('wp-repo::livewire.packages', compact('packages', 'connections'))
             ->layout(config('wp-repo.panel.layout'));
     }
 }

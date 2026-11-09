@@ -8,7 +8,7 @@
 
     <div class="flex items-start justify-between gap-3">
         <div>
-            <a href="{{ route('wp-repo.panel.packages') }}" wire:navigate class="text-xs text-slate-500 hover:underline">← {{ __('wp-repo::messages.back') }}</a>
+            <a href="{{ route('wp-repo.panel.packages',['api_key' =>  data_get($project,"api_key")]) }}" wire:navigate class="text-xs text-slate-500 hover:underline">← {{ __('wp-repo::messages.back') }}</a>
             <h1 class="text-xl font-semibold">{{ $package->name }}</h1>
             <p class="text-xs text-slate-500" dir="ltr">{{ $package->slug }} · {{ $package->repo }} ({{ $package->git_provider }})</p>
         </div>

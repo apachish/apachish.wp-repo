@@ -5,27 +5,19 @@ return [
     |--------------------------------------------------------------------------
     | Git providers
     |--------------------------------------------------------------------------
-    | Tokens must be READ-ONLY and live in .env only. Supported: github, gitlab, gitea (Forgejo too).
+    | NO credentials live here. Every project stores its own Git connection (token + webhook secret,
+    | encrypted) in the database via the panel. These are only the default API endpoints for the hosted
+    | services; self-hosted GitLab/Gitea URLs are entered per connection.
     */
-    'provider' => env('WP_REPO_PROVIDER', 'github'),
-
     'providers' => [
-        'github' => [
-            'api' => env('WP_REPO_GITHUB_API', 'https://api.github.com'),
-            'token' => env('WP_REPO_GITHUB_TOKEN', env('WP_REPO_TOKEN')),
-            'webhook_secret' => env('WP_REPO_GITHUB_WEBHOOK_SECRET', env('WP_REPO_WEBHOOK_SECRET')),
-        ],
-        'gitlab' => [
-            'api' => env('WP_REPO_GITLAB_API', 'https://gitlab.com/api/v4'),
-            'token' => env('WP_REPO_GITLAB_TOKEN', env('WP_REPO_TOKEN')),
-            'webhook_secret' => env('WP_REPO_GITLAB_WEBHOOK_SECRET', env('WP_REPO_WEBHOOK_SECRET')),
-        ],
-        'gitea' => [
-            'api' => env('WP_REPO_GITEA_API'), // e.g. https://git.example.com/api/v1
-            'token' => env('WP_REPO_GITEA_TOKEN', env('WP_REPO_TOKEN')),
-            'webhook_secret' => env('WP_REPO_GITEA_WEBHOOK_SECRET', env('WP_REPO_WEBHOOK_SECRET')),
-        ],
+        'github' => ['api' => 'https://api.github.com'],
+        'gitlab' => ['api' => 'https://gitlab.com/api/v4'],
+        'gitea' => ['api' => null],
     ],
+
+    // Allow connection API URLs that resolve to private/internal IPs (self-hosted Git on your own network).
+    // Leave false in multi-tenant setups, otherwise tenants can make the server call internal addresses.
+    'allow_private_hosts' => false,
 
     /*
     | Storage for built zips (use a private disk, never a public one).
@@ -88,12 +80,13 @@ return [
 
     'panel' => [
         'enabled' => true,
-        'prefix' => 'wp-repo',
-        'middleware' => ['web', 'auth', 'can:manage-wp-repo'],
-        'layout' => 'layouts.app',
-    ],
+        'prefix' => 'panel/{api_key}/wp-repo',
+        'middleware' => [ 'web','auth:web,project', 'can:manage-wp-repo',\App\Http\Middleware\SetProject::class],
 
+        'layout' => 'layouts::panel',
+    ],
     'load_migrations' => true, // set false if you publish the migration
     'schedule' => true,        // register prune + check-sites in the scheduler
     'stale_site_hours' => 48,
+    'guards' => ['web', 'project'],
 ];

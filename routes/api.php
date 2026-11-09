@@ -7,7 +7,7 @@ use Apachish\WpRepo\Http\Controllers\WebhookController;
 use Apachish\WpRepo\Http\Middleware\AuthenticateWpSite;
 use Illuminate\Support\Facades\Route;
 
-Route::post('webhook/{provider}', WebhookController::class)->name('wp-repo.webhook');
+Route::post('webhook/c/{uuid}', WebhookController::class)->name('wp-repo.webhook');
 
 Route::get('check', [UpdateController::class, 'check'])
     ->middleware(AuthenticateWpSite::class)

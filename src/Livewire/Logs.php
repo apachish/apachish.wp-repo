@@ -18,9 +18,14 @@ class Logs extends Component
 
     public ?int $siteId = null;
 
+    public $project;
+
+
     public function mount(): void
     {
         Gate::authorize('manage-wp-repo');
+        $this->project = current_project();
+
     }
 
     public function updating($name): void
